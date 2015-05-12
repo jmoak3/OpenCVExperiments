@@ -14,11 +14,11 @@ struct readCameraThreadObj
 
 struct getImageObj
 {
-	float* frameTime;
 	IplImage * image;
 	int * wait;
  	pthread_cond_t * can_read; 
 	pthread_mutex_t * mutex;
+	int* frames;
 };
 
 void *readCamera(void *voidParams)
@@ -46,16 +46,27 @@ IplImage *getImage(struct getImageObj * params)
 	pthread_cond_wait(params->can_read, params->mutex);
 	IplImage *img = params->image;
 	*(params->wait) = 0;
-	printf("%f\n", *(params->frameTime));
-	*(params->frameTime) = 0.f;
+	++*(params->frames);
 	pthread_mutex_unlock(params->mutex);
-	*(params->wait) = 0;
+	return img;
+}
+
+IplImage *isolateGreen(IplImage * inputImg)
+{
+	IplImage *convertedImg = cvCreateImage(cvGetSize(inputImg), 8, 3);
+	cvCvtColor(inputImg, convertedImg, CV_BGR2HSV);
+	IplImage * img = cvCreateImage(cvGetSize(inputImg), 8, 1);
+	CvScalar lower; lower.val[0] = 30; lower.val[1] = 80; lower.val[2] = 80; lower.val[3] = 0;
+	CvScalar higher; higher.val[0] = 46; higher.val[1] = 255; higher.val[2] = 255; higher.val[3] = 0;
+	cvInRangeS(convertedImg, lower, higher, img);
+	cvReleaseImage(&convertedImg);
 	return img;
 }
 
 int main(int argc, char** argv )
 {
 	cvNamedWindow("Webcam", 1);
+	cvNamedWindow("GreenIsolated", 1);
 	
 	CvCapture *cam = cvCaptureFromCAM(0);
 	//cvSetCaptureProperty(cam, CV_CAP_PROP_AUTO_EXPOSURE, 0);
@@ -63,48 +74,50 @@ int main(int argc, char** argv )
 	pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 	pthread_cond_t can_read = PTHREAD_COND_INITIALIZER;
 	IplImage * image = cvQueryFrame(cam);
-	int *wait = (int*)malloc(sizeof(int)); *wait = 0;
-	float *frameTime = (float*)malloc(sizeof(float)); *frameTime = 0.f;
+	int wait = 0;
 	
 	pthread_t readThread;	
 	struct readCameraThreadObj threadParams;
 	threadParams.cam = cam;
 	threadParams.image = image;
-	threadParams.wait = wait;
+	threadParams.wait = &wait;
 	threadParams.can_read = &can_read;
 	threadParams.mutex = &mutex;
 	
 	threadParams.image = cvQueryFrame(threadParams.cam);
 	pthread_create(&readThread, NULL, &readCamera, (void*)&threadParams);
 	
-	int n = 0;
+	int frames = 0;
 	float totalTime = 0.f;
 	struct timespec timeobj;
 	clock_gettime(CLOCK_MONOTONIC, &timeobj);
-	float lastTime = timeobj.tv_nsec/1000000;
+	float lastTime = timeobj.tv_sec*1000.f + timeobj.tv_nsec/1000000.f;
 	float currTime = lastTime;
-	while(cvWaitKey(1)!=27) 
+	char key = 0;
+	while(key!=27) 
 	{	
 		struct getImageObj imageParams;
-		imageParams.frameTime = frameTime;
 		imageParams.image = image;
-		imageParams.wait = wait;
+		imageParams.wait = &wait;
 		imageParams.can_read = &can_read;
 		imageParams.mutex = &mutex;
-
-		cvShowImage("Webcam", getImage(&imageParams));
-		clock_gettime(CLOCK_MONOTONIC, &timeobj);
-		currTime = timeobj.tv_nsec/1000000;
+		imageParams.frames = &frames;
+		IplImage * webCamFrame = getImage(&imageParams);
+		IplImage * greenFrame = isolateGreen(webCamFrame);
 		
-		*frameTime += currTime - lastTime;
-		totalTime += *frameTime;
-		++n;
-		lastTime = currTime;
+		cvShowImage("Webcam", webCamFrame);
+		cvShowImage("GreenIsolated", greenFrame);
+		clock_gettime(CLOCK_MONOTONIC, &timeobj);
+		
+		key = cvWaitKey(1);
 	}
-	printf("AVG FPS: %f\n", totalTime/n);
+	currTime = timeobj.tv_sec*1000.f + timeobj.tv_nsec/1000000.f;
+	totalTime = currTime - lastTime;
+	printf("AVG FPS: %f\n", (1000.f*(float)frames/totalTime));
 	cvReleaseCapture(&cam);
 	cvDestroyWindow("Webcam");	
-
+	cvDestroyWindow("GreenIsolated");	
+	
 	return 0;
 }
 
