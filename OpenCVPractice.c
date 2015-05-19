@@ -10,6 +10,7 @@
 
 //To Do List: 
 //Read Mesh and draw into frame
+//Track Cricles or track colors?
 //Track two points and keep track of object using them
 
 struct readCameraThreadObj
@@ -93,7 +94,7 @@ IplImage *isolateGreen(IplImage * inputImg)
 	IplImage *convertedImg = cvCreateImage(cvGetSize(inputImg), 8, 3);
 	cvCvtColor(inputImg, convertedImg, CV_BGR2HSV);
 	IplImage * img = cvCreateImage(cvGetSize(inputImg), 8, 1);
-	CvScalar lower; lower.val[0] = 32.5; lower.val[1] = 0; lower.val[2] = 60; lower.val[3] = 0;
+	CvScalar lower; lower.val[0] = 32.5; lower.val[1] = 60; lower.val[2] = 60; lower.val[3] = 0;
 	CvScalar higher; higher.val[0] = 82.5; higher.val[1] = 255; higher.val[2] = 255; higher.val[3] = 0;
 	cvInRangeS(convertedImg, lower, higher, img);
 	cvReleaseImage(&convertedImg);
@@ -105,7 +106,7 @@ IplImage *isolateBlue(IplImage * inputImg)
 	IplImage *convertedImg = cvCreateImage(cvGetSize(inputImg), 8, 3);
 	cvCvtColor(inputImg, convertedImg, CV_BGR2HSV);
 	IplImage * img = cvCreateImage(cvGetSize(inputImg), 8, 1);
-	CvScalar lower; lower.val[0] = 90; lower.val[1] = 0; lower.val[2] = 60; lower.val[3] = 0;
+	CvScalar lower; lower.val[0] = 90; lower.val[1] = 60; lower.val[2] = 60; lower.val[3] = 0;
 	CvScalar higher; higher.val[0] = 130; higher.val[1] = 255; higher.val[2] = 255; higher.val[3] = 0;
 	cvInRangeS(convertedImg, lower, higher, img);
 	cvReleaseImage(&convertedImg);
@@ -169,7 +170,6 @@ int main(int argc, char** argv )
 		cvAdd(greenFrame, blueFrame, greenFrame, NULL);
 		cvShowImage("GreenAndBlueIsolated", greenFrame);
 		clock_gettime(CLOCK_MONOTONIC, &timeobj);
-		
 		key = cvWaitKey(1);
 
 		if (key==99)
